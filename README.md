@@ -93,11 +93,15 @@ The frontend is plain HTML/CSS/JS with **LocalStorage** as a stub "database" so 
 
 The system uses **adaptive Exponential Smoothing** picked by the backend (`forecaster.py`) based on data length and shape:
 
+Initial idea:
 | History length | Model |
 |---|---|
 | ≥ 14 daily points | Triple Exponential Smoothing (Holt-Winters) — captures trend + weekly seasonality |
 | 7–13 daily points | Double Exponential Smoothing (Holt's linear) — captures trend only |
 | 3–6 daily points | Simple Exponential Smoothing — captures level only |
+
+Prototype Agile improvement, (Now Monthly Only):
+METHOD - Rolling Forecast (or Rolling 30-Day Forecast): Main focus feature: 2-3 Years Data for predicting next month(30 days).
 
 Request payload for `POST /forecast`:
 ```json
