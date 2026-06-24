@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production - Vermicast ERP</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-leaf"></i> VERMICAST</h3>
+            <p>ERP System</p>
+        </div>
+        <ul class="nav-menu">
+            <li id="nav-dashboard"><a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li id="nav-inventory"><a href="inventory.html"><i class="fas fa-boxes"></i> Inventory</a></li>
+            <li id="nav-production"><a href="production.html"><i class="fas fa-industry"></i> Production</a></li>
+            <li id="nav-sales"><a href="sales.html"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+            <li id="nav-forecast"><a href="forecast_view.html"><i class="fas fa-chart-line"></i> Forecasting</a></li>
+            <li id="nav-reports"><a href="reports.html"><i class="fas fa-file-alt"></i> Reports</a></li>
+            <li id="nav-users"><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+            <li id="nav-settings"><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="display-name">User</span>
+            </div>
+            <span class="role-badge" id="display-role">ROLE</span>
+            <a href="#" onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="top-bar">
+            <h2>Production Tracking</h2>
+        </header>
+
+        <div class="main-content">
+            <div class="card role-admin role-staff">
+                <div class="card-header">
+                    <h3><i class="fas fa-plus-circle"></i> Start New Production Batch</h3>
+                </div>
+                <div class="card-body">
+                    <form id="production-form">
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label for="batch-id">Batch ID</label>
+                                <input type="text" id="batch-id" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="p-quantity">Production Quantity (No. of Sacks)</label>
+                                <input type="number" id="p-quantity" value="50" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Production Batch</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-tasks"></i> Production History</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label for="date-filter"><i class="fas fa-filter"></i> Filter by Date:</label>
+                        <select id="date-filter" style="width: auto;">
+                            <option value="">-- All Dates --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="data-table" id="production-table">
+                        <thead>
+                            <tr>
+                                <th>Batch ID</th>
+                                <th>No. of Sacks</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/store.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        const user = checkAuth();
+        applyRoleStyles();
+        initSidebar();
+
+        function renderProduction() {
+            populateDateFilter('date-filter');
+            const filterDate = document.getElementById('date-filter').value;
+
+            let production = getData('production');
+            
+            if (filterDate) {
+                production = production.filter(p => {
+                    const d = new Date(p.startDate);
+                    if (isNaN(d.getTime())) return false;
+                    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    return ds === filterDate;
+                });
+            }
+
+            const tbody = document.querySelector('#production-table tbody');
+            tbody.innerHTML = '';
+
+            if (production.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #999; padding: 20px;">${filterDate ? 'No production records for selected date.' : 'No production history yet.'}</td></tr>`;
+            } else {
+                [...production].reverse().forEach(batch => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${batch.id}</td>
+                        <td>${batch.qty} sacks</td>
+                        <td>${batch.startDate}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            
+            document.getElementById('batch-id').value = 'B' + Math.floor(Date.now() / 1000);
+        }
+
+        document.getElementById('date-filter').addEventListener('change', renderProduction);
+
+        document.getElementById('production-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('batch-id').value;
+            const qty = parseFloat(document.getElementById('p-quantity').value);
+
+            const batches = getData('production');
+            batches.push({
+                id, qty, 
+                startDate: new Date().toLocaleDateString(),
+                status: 'Processing'
+            });
+            saveData('production', batches);
+
+            alert("Production batch created!");
+            renderProduction();
+        });
+
+        function updateBatchStatus(id, newStatus) {
+            const batches = getData('production');
+            const batch = batches.find(b => b.id === id);
+            if (batch) {
+                batch.status = newStatus;
+                saveData('production', batches);
+                renderProduction();
+            }
+        }
+
+        function completeBatch(id) {
+            const batches = getData('production');
+            const batch = batches.find(b => b.id === id);
+            if (batch) {
+                batch.status = 'Completed';
+                updateStock('v_cast', batch.qty, `Completed batch ${id}`);
+                saveData('production', batches);
+                alert(`Batch ${id} completed. ${batch.qty} sacks added.`);
+                renderProduction();
+            }
+        }
+
+        renderProduction();
+    </script>
+</body>
+</html>

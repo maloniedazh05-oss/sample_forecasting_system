@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Vermicast ERP</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-leaf"></i> VERMICAST</h3>
+            <p>ERP System</p>
+        </div>
+        <ul class="nav-menu">
+            <li id="nav-dashboard"><a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li id="nav-inventory"><a href="inventory.html"><i class="fas fa-boxes"></i> Inventory</a></li>
+            <li id="nav-production"><a href="production.html"><i class="fas fa-industry"></i> Production</a></li>
+            <li id="nav-sales"><a href="sales.html"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+            <li id="nav-forecast"><a href="forecast_view.html"><i class="fas fa-chart-line"></i> Forecasting</a></li>
+            <li id="nav-reports"><a href="reports.html"><i class="fas fa-file-alt"></i> Reports</a></li>
+            <li id="nav-users"><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+            <li id="nav-settings"><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="display-name">User</span>
+            </div>
+            <span class="role-badge" id="display-role">ROLE</span>
+            <a href="#" onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="top-bar">
+            <h2>Dashboard Overview</h2>
+            <div class="header-actions" style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-success btn-sm" id="btn-generate-forecast">
+                    <i class="fas fa-sync"></i> Generate Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span>
+                </button>
+                <button class="btn btn-primary btn-sm" id="btn-set-goal">
+                    <i class="fas fa-bullseye"></i> Set Sales Goal
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div id="stock-alert-container"></div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-stock">0 sacks</div>
+                    <p>Vermicast Stock</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-forecast">-- sacks</div>
+                    <p>Next Period Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-active-batches">0</div>
+                    <p>Active Batches</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-goal">-- sacks</div>
+                    <p>Monthly Sales Goal (<span id="stat-goal-progress">--%</span> of goal)</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-area"></i> Sales vs Stockout Prediction Trend<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="salesChart" height="100"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-primary" onclick="window.location.href='sales.html'">
+                            <i class="fas fa-plus"></i> Record Sale
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.location.href='production.html'">
+                            <i class="fas fa-play"></i> Start Batch
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/store.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        const user = checkAuth();
+        applyRoleStyles();
+        initSidebar();
+
+        // Load stats
+        function updateDashboard() {
+            const inventory = getData('inventory');
+            const vcast = inventory.find(i => i.id === 'v_cast');
+            document.getElementById('stat-stock').textContent = `${vcast.stock} sacks`;
+
+            const production = getData('production');
+            const active = production.filter(p => p.status !== 'Completed').length;
+            document.getElementById('stat-active-batches').textContent = active;
+
+            // Goal stat (current month sales vs target)
+            const sales = getData('sales');
+            const now = new Date();
+            const currentMonthLabel = `${now.getMonth() + 1}/1/${now.getFullYear()}`;
+            const monthTotal = sales
+                .filter(s => s.rawDate && new Date(s.rawDate).getMonth() === now.getMonth() && new Date(s.rawDate).getFullYear() === now.getFullYear())
+                .reduce((acc, s) => acc + (s.amount || 0), 0);
+            const goal = parseFloat(localStorage.getItem('salesGoal')) || 0;
+            if (goal > 0) {
+                document.getElementById('stat-goal').textContent = `${goal} sacks`;
+                const pct = Math.min(100, Math.round((monthTotal / goal) * 100));
+                document.getElementById('stat-goal-progress').textContent = `${pct}%`;
+                document.getElementById('stat-goal-progress').style.color = pct >= 100 ? 'var(--success)' : 'var(--text)';
+            } else {
+                document.getElementById('stat-goal').textContent = '-- sacks';
+                document.getElementById('stat-goal-progress').textContent = '--';
+            }
+
+            // ROP Alert
+            const settings = getSettings();
+            const alertContainer = document.getElementById('stock-alert-container');
+            alertContainer.innerHTML = '';
+
+            if (vcast.stock <= settings.rop) {
+                alertContainer.innerHTML = `<div class="alert alert-red"><strong><i class="fas fa-exclamation-triangle"></i> CRITICAL:</strong> Stock level (${vcast.stock} sacks) is below Re-Order Point (${settings.rop} sacks).</div>`;
+            } else if (vcast.stock <= settings.rop * 1.2) {
+                alertContainer.innerHTML = `<div class="alert alert-yellow"><strong><i class="fas fa-info-circle"></i> CAUTION:</strong> Stock level (${vcast.stock} sacks) is approaching Re-Order Point.</div>`;
+            } else {
+                alertContainer.innerHTML = `<div class="alert alert-green"><i class="fas fa-check-circle"></i> Stock levels are healthy.</div>`;
+            }
+
+            renderChart();
+        }
+
+        async function generateForecast() {
+            const sales = getData('sales');
+            const settings = getSettings();
+            
+            if (sales.length < 3) {
+                alert('Need at least 3 historical data points for stockout prediction.');
+                return;
+            }
+
+            const salesData = sales.slice(-12).map(s => s.amount);
+            try {
+                const result = await getForecast(salesData, settings.alpha);
+                if (result.prediction) {
+                    const prediction = Math.round(result.prediction);
+                    document.getElementById('stat-forecast').textContent = `${prediction} sacks`;
+                    localStorage.setItem('lastForecast', prediction);
+                    saveForecastHistory(prediction, settings);
+                    renderChart();
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Connection error. Please run the backend server.');
+            }
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            const sales = getData('sales').slice(-6);
+            const labels = sales.map(s => s.month);
+            const data = sales.map(s => s.amount);
+
+            const lastForecast = localStorage.getItem('lastForecast');
+            const hasForecast = lastForecast !== null && lastForecast !== '' && !isNaN(parseFloat(lastForecast));
+
+            const xLabels = hasForecast ? [...labels, 'Stockout'] : [...labels];
+            const xLen = xLabels.length;
+
+            const actualData = [...data];
+            while (actualData.length < xLen) actualData.push(null);
+
+            const forecastData = hasForecast
+                ? [...data.map(() => null), parseFloat(lastForecast)]
+                : data.map(() => null);
+
+            const goal = parseFloat(localStorage.getItem('salesGoal')) || 0;
+            const goalData = goal > 0 ? new Array(xLen).fill(goal) : [];
+
+            if (window.myChart) window.myChart.destroy();
+
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: xLabels,
+                    datasets: [{
+                        label: 'Actual Sales',
+                        data: actualData,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Stockout Prediction',
+                        data: forecastData,
+                        borderColor: '#f39c12',
+                        borderDash: [5, 5],
+                        pointStyle: 'rectRot',
+                        pointRadius: 10,
+                        fill: false
+                    }, {
+                        label: 'Sales Goal (sacks)',
+                        data: goalData,
+                        borderColor: '#2ecc71',
+                        borderDash: [10, 5],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function setSalesGoal() {
+            const current = localStorage.getItem('salesGoal') || '';
+            const input = prompt('Set your monthly sales goal (total No. of Sacks to sell):', current || '');
+            if (input === null) return;
+            const value = parseFloat(input);
+            if (isNaN(value) || value <= 0) {
+                alert('Please enter a positive number.');
+                return;
+            }
+            localStorage.setItem('salesGoal', value);
+            updateDashboard();
+            renderChart();
+        }
+
+        document.getElementById('btn-set-goal').addEventListener('click', setSalesGoal);
+        document.getElementById('btn-generate-forecast').addEventListener('click', generateForecast);
+        updateDashboard();
+        
+        // Populate mock if empty
+        if (getData('sales').length === 0) {
+            initData();
+            updateDashboard();
+        }
+    </script>
+</body>
+</html>

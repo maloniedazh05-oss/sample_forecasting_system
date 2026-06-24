@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - Vermicast ERP</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-leaf"></i> VERMICAST</h3>
+            <p>ERP System</p>
+        </div>
+        <ul class="nav-menu">
+            <li id="nav-dashboard"><a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li id="nav-inventory"><a href="inventory.html"><i class="fas fa-boxes"></i> Inventory</a></li>
+            <li id="nav-production"><a href="production.html"><i class="fas fa-industry"></i> Production</a></li>
+            <li id="nav-sales"><a href="sales.html"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+            <li id="nav-forecast"><a href="forecast_view.html"><i class="fas fa-chart-line"></i> Forecasting</a></li>
+            <li id="nav-reports"><a href="reports.html"><i class="fas fa-file-alt"></i> Reports</a></li>
+            <li id="nav-users"><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+            <li id="nav-settings"><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="display-name">User</span>
+            </div>
+            <span class="role-badge" id="display-role">ROLE</span>
+            <a href="#" onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="top-bar">
+            <h2>User Management</h2>
+        </header>
+
+        <div class="main-content">
+            <!-- Edit Admin Password Modal -->
+            <div id="edit-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Edit Admin Password</h3>
+                        <button class="close-btn" onclick="closeEditModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="edit-password-form">
+                            <div class="form-group">
+                                <label for="current-password">Current Password</label>
+                                <input type="password" id="current-password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-new-password">New Password</label>
+                                <input type="password" id="edit-new-password" required>
+                            </div>
+                            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                <button type="submit" class="btn btn-primary">Update Password</button>
+                                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-user-plus"></i> Add New User</h3>
+                </div>
+                <div class="card-body">
+                    <form id="user-form">
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label for="new-username">Username</label>
+                                <input type="text" id="new-username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-password">Password</label>
+                                <input type="password" id="new-password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-role">Role</label>
+                                <select id="new-role">
+                                    <option value="admin">Admin</option>
+                                    <option value="staff">Production Staff</option>
+                                    <option value="manager">Inventory Manager</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: flex-end; padding-bottom: 15px;">
+                                <button type="submit" class="btn btn-primary btn-block">Add User</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-users-cog"></i> System Users</h3>
+                </div>
+                <div class="card-body">
+                    <table class="data-table" id="users-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/store.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        const user = checkAuth();
+        if (user.role !== 'admin') {
+            alert("Access Denied: Admin only.");
+            window.location.href = 'dashboard.html';
+        }
+        applyRoleStyles();
+        initSidebar();
+
+        function renderUsers() {
+            const users = getData('users');
+            const tbody = document.querySelector('#users-table tbody');
+            tbody.innerHTML = '';
+
+            users.forEach((u, index) => {
+                const tr = document.createElement('tr');
+                const isMainAdmin = u.username === 'admin';
+                const statusClass = u.status.toLowerCase();
+                
+                tr.innerHTML = `
+                    <td>${u.username}</td>
+                    <td><span class="role-badge ${u.role}">${u.role.toUpperCase()}</span></td>
+                    <td><span class="status-badge ${statusClass}">${u.status}</span></td>
+                    <td>
+                        ${isMainAdmin ? 
+                            `<button onclick="openEditModal()" class="btn btn-secondary btn-sm">Edit Password</button>` : 
+                            `<button onclick="toggleUserStatus(${index})" class="btn btn-secondary btn-sm">${u.status === 'Active' ? 'Deactivate' : 'Activate'}</button>`
+                        }
+                        ${!isMainAdmin ? `<button onclick="deleteUser(${index})" class="btn btn-danger btn-sm">Delete</button>` : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openEditModal() { document.getElementById('edit-modal').classList.add('active'); }
+        function closeEditModal() { 
+            document.getElementById('edit-modal').classList.remove('active');
+            document.getElementById('edit-password-form').reset();
+        }
+
+        document.getElementById('edit-password-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const currentPass = document.getElementById('current-password').value;
+            const newPass = document.getElementById('edit-new-password').value;
+            const users = getData('users');
+            const adminUser = users.find(u => u.username === 'admin');
+            if (adminUser.password !== currentPass) { alert("Incorrect current password."); return; }
+            adminUser.password = newPass;
+            saveData('users', users);
+            alert("Password updated successfully!");
+            closeEditModal();
+        });
+
+        document.getElementById('user-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('new-username').value;
+            const password = document.getElementById('new-password').value;
+            const role = document.getElementById('new-role').value;
+            const users = getData('users');
+            if (users.find(u => u.username === username)) { alert("Username already exists."); return; }
+            users.push({ username, password, role, status: 'Active' });
+            saveData('users', users);
+            alert("User added!");
+            renderUsers();
+            e.target.reset();
+        });
+
+        function toggleUserStatus(index) {
+            const users = getData('users');
+            users[index].status = users[index].status === 'Active' ? 'Inactive' : 'Active';
+            saveData('users', users);
+            renderUsers();
+        }
+
+        function deleteUser(index) {
+            if (confirm("Delete this user?")) {
+                const users = getData('users');
+                users.splice(index, 1);
+                saveData('users', users);
+                renderUsers();
+            }
+        }
+
+        renderUsers();
+    </script>
+</body>
+</html>

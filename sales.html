@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales - Vermicast ERP</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-leaf"></i> VERMICAST</h3>
+            <p>ERP System</p>
+        </div>
+        <ul class="nav-menu">
+            <li id="nav-dashboard"><a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li id="nav-inventory"><a href="inventory.html"><i class="fas fa-boxes"></i> Inventory</a></li>
+            <li id="nav-production"><a href="production.html"><i class="fas fa-industry"></i> Production</a></li>
+            <li id="nav-sales"><a href="sales.html"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+            <li id="nav-forecast"><a href="forecast_view.html"><i class="fas fa-chart-line"></i> Forecasting</a></li>
+            <li id="nav-reports"><a href="reports.html"><i class="fas fa-file-alt"></i> Reports</a></li>
+            <li id="nav-users"><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+            <li id="nav-settings"><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="display-name">User</span>
+            </div>
+            <span class="role-badge" id="display-role">ROLE</span>
+            <a href="#" onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="top-bar">
+            <h2>Sales Management</h2>
+        </header>
+
+        <div class="main-content">
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-file-import"></i> Historical Data</h3>
+                </div>
+                <div class="card-body" style="display: flex; justify-content: flex-start; align-items: center;">
+                    <button type="button" id="btn-import-historical" class="btn btn-secondary">
+                        <i class="fas fa-upload"></i> Import Historical Data
+                    </button>
+                </div>
+            </div>
+
+            <div class="card role-admin role-manager">
+                <div class="card-header">
+                    <h3><i class="fas fa-cart-plus"></i> Record Monthly Sales</h3>
+                </div>
+                <div class="card-body">
+                    <form id="sales-form">
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label for="s-month">Month</label>
+                                <select id="s-month" required>
+                                    <option value="" disabled selected>-- Select Month --</option>
+                                    <option value="January">January</option>
+                                    <option value="February">February</option>
+                                    <option value="March">March</option>
+                                    <option value="April">April</option>
+                                    <option value="May">May</option>
+                                    <option value="June">June</option>
+                                    <option value="July">July</option>
+                                    <option value="August">August</option>
+                                    <option value="September">September</option>
+                                    <option value="October">October</option>
+                                    <option value="November">November</option>
+                                    <option value="December">December</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="s-amount">Total Stock-Out (No. of Sacks)<span class="term-help" data-tip="Stock-Out — A transaction recording items issued or sold out of inventory (an outflow).">?</span></label>
+                                <input type="number" id="s-amount" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Sales Record</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-history"></i> Daily Sales & Inventory Summaries</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label for="date-filter"><i class="fas fa-filter"></i> Filter by Date:</label>
+                        <select id="date-filter" style="width: auto;">
+                            <option value="">-- All Dates --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body" id="grouped-history-container">
+                    <!-- Groups will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Group Edit Modal -->
+    <div id="group-edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Daily Summary</h3>
+                <button class="close-btn" onclick="closeEditGroupModal()">&times;</button>
+            </div>
+            <form id="group-edit-form">
+                <div class="modal-body">
+                    <input type="hidden" id="edit-group-old-date">
+                    <div class="form-group">
+                        <label for="edit-group-date">Date</label>
+                        <input type="date" id="edit-group-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-group-name">Group Name / Event</label>
+                        <input type="text" id="edit-group-name" placeholder="e.g., Weekly Delivery, Month-end Sale">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-group-desc">Description</label>
+                        <textarea id="edit-group-desc" rows="3" placeholder="Additional details about this day's activities..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditGroupModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/store.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        const user = checkAuth();
+        applyRoleStyles();
+        initSidebar();
+
+        document.getElementById('btn-import-historical').addEventListener('click', () => {
+            alert('Import Historical Data: feature placeholder. Select a CSV/JSON file (not yet implemented).');
+        });
+
+        function renderSales() {
+            populateDateFilter('date-filter');
+            const filterDate = document.getElementById('date-filter').value;
+
+            const inventoryHistory = getData('inventory_history');
+            const salesHistory = getData('sales');
+            let groups = groupActivitiesByDate(inventoryHistory, salesHistory);
+            
+            if (filterDate) {
+                groups = groups.filter(g => g.date === filterDate);
+            }
+
+            const container = document.getElementById('grouped-history-container');
+            container.innerHTML = '';
+
+            if (groups.length === 0) {
+                container.innerHTML = `<p style="text-align: center; color: #999; padding: 20px;">${filterDate ? 'No history for selected date.' : 'No history recorded yet.'}</p>`;
+                return;
+            }
+
+            const settings = getSettings();
+
+            groups.forEach(group => {
+                const log = getDailyLog(group.date);
+                const groupEl = document.createElement('div');
+                groupEl.className = 'history-group';
+                groupEl.style.marginBottom = '2rem';
+                groupEl.style.border = '1px solid var(--border-color)';
+                groupEl.style.borderRadius = '8px';
+                groupEl.style.overflow = 'hidden';
+
+                groupEl.innerHTML = `
+                    <div class="group-header" style="background: var(--table-header); padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h4 style="margin-bottom: 5px;"><i class="fas fa-calendar-day"></i> ${new Date(group.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
+                            ${log.name ? `<p><strong>${log.name}</strong></p>` : ''}
+                            ${log.description ? `<p style="font-size: 0.9rem; color: #666;">${log.description}</p>` : ''}
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="openEditGroupModal('${group.date}')">
+                            <i class="fas fa-edit"></i> Edit Details
+                        </button>
+                    </div>
+                    <table class="data-table" style="margin-bottom: 0;">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Activity</th>
+                                <th>Details</th>
+                                <th>No. of Sacks</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${group.activities.sort((a,b) => b.rawDate - a.rawDate).map(a => {
+                                return `
+                                    <tr>
+                                        <td>${new Date(a.rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                        <td>
+                                            ${a.type === 'sales'
+                                                ? `<span style="color: var(--success)"><i class="fas fa-shopping-cart"></i> Sale</span>`
+                                                : `<span style="color: var(--secondary)"><i class="fas fa-boxes"></i> Stock</span>`
+                                            }
+                                        </td>
+                                        <td>
+                                            ${a.type === 'sales'
+                                                ? `<strong>Vermicast Stock-Out<span class="term-help" data-tip="Stock-Out — A transaction recording items issued or sold out of inventory (an outflow).">?</span></strong><br><small>${a.month}</small>`
+                                                : `<strong>${a.itemName}</strong><br><small>${a.note}</small>`
+                                            }
+                                        </td>
+                                        <td style="color: ${a.type === 'sales' ? 'var(--danger)' : (a.change < 0 ? 'var(--danger)' : 'var(--success)')}">
+                                            ${a.type === 'sales' ? a.amount : a.change}
+                                        </td>
+                                        <td>
+                                            ${a.type === 'sales' 
+                                                ? `<button onclick="deleteSale('${a.month}', ${a.rawDate || 0})" class="btn btn-secondary btn-sm">Delete</button>`
+                                                : `-`
+                                            }
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+                container.appendChild(groupEl);
+            });
+        }
+
+        document.getElementById('date-filter').addEventListener('change', renderSales);
+
+        document.getElementById('sales-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const month = document.getElementById('s-month').value;
+            const amount = parseFloat(document.getElementById('s-amount').value);
+
+            recordSale(month, amount);
+
+            alert("Sales record added!");
+            renderSales();
+            e.target.reset();
+        });
+
+        document.getElementById('group-edit-form').addEventListener('submit', (e) => {
+            handleGroupEditSubmit(e, () => {
+                renderSales();
+            });
+        });
+
+        function deleteSale(month, rawDate) {
+            if (confirm("Delete this record?")) {
+                let sales = getData('sales');
+                sales = sales.filter(s => !(s.month === month && s.rawDate === rawDate));
+                saveData('sales', sales);
+                renderSales();
+            }
+        }
+
+        renderSales();
+    </script>
+</body>
+</html>

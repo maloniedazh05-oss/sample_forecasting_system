@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stockout Prediction - Vermicast ERP</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const TERM_TIP_PREDICTION = "Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.";
+        const TERM_TIP_STOCKOUT = "Stockout Projection — The projected number of days until inventory is depleted, given the current consumption rate.";
+        const TERM_TIP_TRANSACTION = "Stock-Out — A transaction recording items issued or sold out of inventory (an outflow).";
+        function stockoutHelp(tip) {
+            return `<span class="term-help" data-tip="${tip.replace(/"/g, '"')}">?</span>`;
+        }
+    </script>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-leaf"></i> VERMICAST</h3>
+            <p>ERP System</p>
+        </div>
+        <ul class="nav-menu">
+            <li id="nav-dashboard"><a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li id="nav-inventory"><a href="inventory.html"><i class="fas fa-boxes"></i> Inventory</a></li>
+            <li id="nav-production"><a href="production.html"><i class="fas fa-industry"></i> Production</a></li>
+            <li id="nav-sales"><a href="sales.html"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+            <li id="nav-forecast"><a href="forecast_view.html"><i class="fas fa-chart-line"></i> Forecasting</a></li>
+            <li id="nav-reports"><a href="reports.html"><i class="fas fa-file-alt"></i> Reports</a></li>
+            <li id="nav-users"><a href="users.html"><i class="fas fa-users"></i> Users</a></li>
+            <li id="nav-settings"><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="display-name">User</span>
+            </div>
+            <span class="role-badge" id="display-role">ROLE</span>
+            <a href="#" onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="top-bar">
+            <h2>Detailed Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h2>
+            <div class="header-actions"></div>
+        </header>
+
+        <div class="main-content">
+            <!-- Month Selection Card -->
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-calendar-check"></i> Monthly Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h3>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 1rem;"><small>Select a month that contains historical data. The full month will be used to project when current stock will run out.</small></p>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <label for="month-select" style="margin-bottom: 0; font-weight: 600;">Select Month:</label>
+                        <select id="month-select" style="width: auto; flex: 1; max-width: 320px;">
+                            <option value="">-- No months available --</option>
+                        </select>
+                        <button class="btn btn-primary" id="calcBtn" disabled>
+                            <i class="fas fa-calculator"></i> Calculate Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div id="summaryCards" class="stats-grid hidden">
+                <div class="stat-card">
+                    <div class="stat-value" id="ssCurrent">-</div>
+                    <p>Current Stock (No. of Sacks)</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="ssAvgDaily">-</div>
+                    <p>Stock Demand (Avg Daily)</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="ssStockout">-</div>
+                    <p>Stockout Projection (Days Until Zero)<span class="term-help" data-tip="Stockout Projection — The projected number of days until inventory is depleted, given the current consumption rate.">?</span></p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="ssTotalDemand">-</div>
+                    <p>30-Day Total Stock Demand</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="ssSuggestedProduction">-</div>
+                    <p>Suggested Production Batches</p>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div id="alertsCard" class="hidden">
+                <div class="alert" id="stockAlertsList"></div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card hidden" id="chartCard">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-line"></i> Next 30 Days Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="next30Chart" height="100"></canvas>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="card hidden" id="tableCard">
+                <div class="card-header">
+                    <h3><i class="fas fa-table"></i> Stockout Prediction Breakdown<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h3>
+                </div>
+                <div class="card-body">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Predicted Stock-Out (No. of Sacks)<span class="term-help" data-tip="Predicted Stock-Out — The forecasted daily volume leaving inventory (predicted outflow in sacks).">?</span></th>
+                                <th>Cumulative</th>
+                                <th>Stock Left</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/store.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        const user = checkAuth();
+        applyRoleStyles();
+        initSidebar();
+
+        let state = {
+            selectedKey: '',
+            historyDates: [],
+            historySales: [],
+            monthEndStock: null,
+            chart: null
+        };
+
+        function populateMonthSelect() {
+            const months = getMonthsWithHistory();
+            const sel = document.getElementById('month-select');
+
+            if (months.length === 0) {
+                sel.innerHTML = '<option value="">-- No months available --</option>';
+                document.getElementById('calcBtn').disabled = true;
+                return;
+            }
+
+            sel.innerHTML = '<option value="">-- Select a month --</option>' +
+                months.map(m => `<option value="${m.key}">${m.label} (${m.dayCount} day${m.dayCount === 1 ? '' : 's'})</option>`).join('');
+            document.getElementById('calcBtn').disabled = true;
+
+            sel.onchange = () => {
+                state.selectedKey = sel.value;
+                document.getElementById('calcBtn').disabled = !state.selectedKey;
+                const match = months.find(m => m.key === state.selectedKey);
+                state.historyDates = [];
+                state.historySales = [];
+                state.monthEndStock = null;
+                if (!match) return;
+
+                for (let d = 1; d <= 31; d++) {
+                    const ds = `${match.year}-${String(match.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    if (new Date(ds).getMonth() !== match.month) break;
+                    const dayData = getAggregatedDataForDate(ds);
+                    state.historyDates.push(ds);
+                    state.historySales.push(dayData.sales || 0);
+                    if (dayData.stock !== null && dayData.stock !== undefined) {
+                        state.monthEndStock = dayData.stock;
+                    }
+                }
+            };
+        }
+
+        async function calculateForecast() {
+            if (!state.selectedKey) {
+                alert("Please select a month first.");
+                return;
+            }
+            if (state.historyDates.length < 3) {
+                alert("Need at least 3 days of history in the selected month.");
+                return;
+            }
+
+            try {
+                const settings = getSettings();
+                const res = await fetch('http://localhost:5001/forecast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sales_data: state.historySales,
+                        dates: state.historyDates,
+                        off_dates: [],
+                        periods: 30,
+                        current_stock: state.monthEndStock,
+                        alpha: settings.alpha
+                    })
+                });
+
+                const result = await res.json();
+                if (result.status === 'error') {
+                    alert('Stockout prediction error: ' + result.message);
+                    return;
+                }
+                renderResults(result);
+            } catch (e) {
+                console.error(e);
+                alert("Stockout prediction calculation failed. Make sure the backend is running on port 5001.");
+            }
+        }
+
+        function renderResults(data) {
+            document.getElementById('summaryCards').classList.remove('hidden');
+            document.getElementById('chartCard').classList.remove('hidden');
+            document.getElementById('tableCard').classList.remove('hidden');
+
+            const currentStock = (data.current_stock !== null && data.current_stock !== undefined && data.current_stock >= 0) ? data.current_stock : null;
+            document.getElementById('ssCurrent').textContent = currentStock !== null ? `${currentStock} sacks` : 'N/A';
+
+            const avgDaily = data.avg_daily_forecast && data.avg_daily_forecast > 0 ? data.avg_daily_forecast : null;
+            document.getElementById('ssAvgDaily').textContent = avgDaily !== null ? `${avgDaily} sacks` : '--';
+
+            document.getElementById('ssStockout').textContent = data.days_until_stockout ? data.days_until_stockout + ' Days' : 'N/A';
+
+            const total30Day = data.predictions.slice(0, 30).reduce((a, b) => a + Math.max(0, b), 0);
+            document.getElementById('ssTotalDemand').textContent = total30Day > 0 ? `${total30Day.toFixed(1)} sacks` : '--';
+
+            const suggestedProduction = Math.round(total30Day - (currentStock || 0));
+            if (total30Day > 0 && currentStock !== null) {
+                document.getElementById('ssSuggestedProduction').textContent = suggestedProduction > 0
+                    ? `+${suggestedProduction} sacks`
+                    : `${Math.abs(suggestedProduction)} sacks surplus`;
+            } else {
+                document.getElementById('ssSuggestedProduction').textContent = 'N/A';
+            }
+
+            const predictionText = total30Day > 0
+                ? `<strong>30-Day Stock Demand:</strong> ${total30Day.toFixed(1)} sacks`
+                : `<strong>30-Day Stock Demand:</strong> --`;
+
+            const el = document.getElementById('stockAlertsList');
+            el.parentElement.classList.remove('hidden');
+            if (data.action_alerts && data.action_alerts.length > 0) {
+                const alert = data.action_alerts[0];
+                el.className = `alert alert-${alert.severity === 'danger' ? 'red' : (alert.severity === 'warning' ? 'yellow' : 'green')}`;
+                el.innerHTML = `<div>${predictionText}</div><div style="margin-top: 10px;"><strong>${alert.message}</strong>: ${alert.detail}</div>`;
+            } else {
+                el.className = 'alert alert-green';
+                el.innerHTML = predictionText;
+            }
+
+            renderForecastChart(data.predictions);
+            renderForecastTable(data.predictions);
+        }
+
+        function renderForecastChart(predictions) {
+            const ctx = document.getElementById('next30Chart').getContext('2d');
+
+            const historyLabels = state.historyDates.map(ds => {
+                const [y, m, d] = ds.split('-');
+                return `${parseInt(m)}/${parseInt(d)}`;
+            });
+
+            const forecastLabels = [];
+            const lastDate = new Date(state.historyDates[state.historyDates.length - 1] + 'T12:00:00');
+            for (let i = 1; i <= 30; i++) {
+                const d = new Date(lastDate);
+                d.setDate(d.getDate() + i);
+                forecastLabels.push(`${d.getMonth() + 1}/${d.getDate()}`);
+            }
+
+            const forecastSlice = predictions.slice(0, 30).map(v => Math.max(0, v));
+
+            if (state.chart) state.chart.destroy();
+            state.chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [...historyLabels, ...forecastLabels],
+                    datasets: [{
+                        label: 'Historical Stock-Out',
+                        data: [...state.historySales, ...forecastLabels.map(() => null)],
+                        backgroundColor: 'rgba(52, 152, 219, 0.3)',
+                        borderColor: '#3498db',
+                        borderWidth: 1
+                    }, {
+                        label: 'Predicted Stock-Out',
+                        data: [...state.historySales.map(() => null), ...forecastSlice],
+                        backgroundColor: 'rgba(243, 156, 18, 0.6)',
+                        borderColor: '#f39c12',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true },
+                        x: { ticks: { maxRotation: 90, minRotation: 45, autoSkip: true, maxTicksLimit: 20 } }
+                    }
+                }
+            });
+        }
+
+        function renderForecastTable(predictions) {
+            const tbody = document.getElementById('dailyBody');
+            tbody.innerHTML = '';
+
+            const lastDate = new Date(state.historyDates[state.historyDates.length - 1] + 'T12:00:00');
+
+            let cum = 0;
+            predictions.forEach((p, i) => {
+                const d = new Date(lastDate);
+                d.setDate(d.getDate() + i + 1);
+                const dateLabel = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+
+                const safeP = Math.max(0, p);
+                cum += safeP;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${dateLabel}</td>
+                    <td><strong>${p < 0 ? '--' : `${p} sacks`}</strong></td>
+                    <td>${cum.toFixed(1)} sacks</td>
+                    <td>-</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('calcBtn').onclick = calculateForecast;
+
+        initData();
+        populateMonthSelect();
+    </script>
+</body>
+</html>
