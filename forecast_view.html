@@ -52,17 +52,16 @@
             <!-- Month Selection Card -->
             <div class="card">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3><i class="fas fa-calendar-check"></i> Monthly Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h3>
+                    <h3><i class="fas fa-calendar-check"></i> Forecast Inventory Demand<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span></h3>
                 </div>
                 <div class="card-body">
-                    <p style="margin-bottom: 1rem;"><small>Select a month that contains historical data. The full month will be used to project when current stock will run out.</small></p>
-                    <div style="display: flex; gap: 1rem; align-items: center;">
-                        <label for="month-select" style="margin-bottom: 0; font-weight: 600;">Select Month:</label>
-                        <select id="month-select" style="width: auto; flex: 1; max-width: 320px;">
-                            <option value="">-- No months available --</option>
+                    <p style="margin-bottom: 1rem;">Choose a future month to predict demand.</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;">
+                        <select id="month-select" style="width: auto; flex: 1; min-width: 220px; max-width: 320px;">
+                            <option value="">Select Month</option>
                         </select>
                         <button class="btn btn-primary" id="calcBtn" disabled>
-                            <i class="fas fa-calculator"></i> Calculate Stockout Prediction<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span>
+                            <i class="fas fa-calculator"></i> Generate Forecast<span class="term-help" data-tip="Stockout Prediction — Forecasts when current inventory will reach zero, based on the predicted daily consumption rate.">?</span>
                         </button>
                     </div>
                 </div>
@@ -145,38 +144,76 @@
             chart: null
         };
 
-        function populateMonthSelect() {
-            const months = getMonthsWithHistory();
-            const sel = document.getElementById('month-select');
+        const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-            if (months.length === 0) {
-                sel.innerHTML = '<option value="">-- No months available --</option>';
-                document.getElementById('calcBtn').disabled = true;
-                return;
+        function buildMonthOptions() {
+            const months = getMonthsWithHistory();
+            const now = new Date();
+            const historyLabels = MONTHS_SHORT;
+            const options = [];
+
+            months.forEach(m => {
+                options.push({
+                    key: m.key,
+                    year: m.year,
+                    month: m.month,
+                    label: `${m.label} (history)`,
+                    dayCount: m.dayCount,
+                    kind: 'history'
+                });
+            });
+
+            for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+                const y = d.getFullYear();
+                const m = d.getMonth();
+                const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+                if (options.find(o => o.key === key)) continue;
+                options.push({
+                    key,
+                    year: y,
+                    month: m,
+                    label: `${MONTHS_SHORT[m]} ${y}`,
+                    dayCount: 0,
+                    kind: i === 0 ? 'current' : 'future'
+                });
+                if (options.length >= 12) break;
             }
 
-            sel.innerHTML = '<option value="">-- Select a month --</option>' +
-                months.map(m => `<option value="${m.key}">${m.label} (${m.dayCount} day${m.dayCount === 1 ? '' : 's'})</option>`).join('');
+            return options.slice(0, 12);
+        }
+
+        function populateMonthSelect() {
+            const sel = document.getElementById('month-select');
+            const options = buildMonthOptions();
+
+            sel.innerHTML = '<option value="">Select Month</option>' +
+                options.map(m => `<option value="${m.key}">${m.label}</option>`).join('');
+
             document.getElementById('calcBtn').disabled = true;
 
             sel.onchange = () => {
                 state.selectedKey = sel.value;
                 document.getElementById('calcBtn').disabled = !state.selectedKey;
-                const match = months.find(m => m.key === state.selectedKey);
+                const match = options.find(m => m.key === state.selectedKey);
                 state.historyDates = [];
                 state.historySales = [];
                 state.monthEndStock = null;
                 if (!match) return;
 
-                for (let d = 1; d <= 31; d++) {
-                    const ds = `${match.year}-${String(match.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    if (new Date(ds).getMonth() !== match.month) break;
-                    const dayData = getAggregatedDataForDate(ds);
-                    state.historyDates.push(ds);
-                    state.historySales.push(dayData.sales || 0);
-                    if (dayData.stock !== null && dayData.stock !== undefined) {
-                        state.monthEndStock = dayData.stock;
+                if (match.kind === 'history') {
+                    for (let d = 1; d <= 31; d++) {
+                        const ds = `${match.year}-${String(match.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        if (new Date(ds).getMonth() !== match.month) break;
+                        const dayData = getAggregatedDataForDate(ds);
+                        state.historyDates.push(ds);
+                        state.historySales.push(dayData.sales || 0);
+                        if (dayData.stock !== null && dayData.stock !== undefined) {
+                            state.monthEndStock = dayData.stock;
+                        }
                     }
+                } else {
+                    state.monthEndStock = null;
                 }
             };
         }

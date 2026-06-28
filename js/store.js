@@ -267,17 +267,17 @@ async function loadMonthTemplate(monthIndex, year, legacyDays) {
         const isOffDay = isWeekend || isHoliday;
 
         let safeAmount = 0;
-        if (!isOffDay) {
+        const targetAmount = (() => {
             baseValue += (Math.random() * 5 - 2);
             if (baseValue > 80) baseValue = 80;
-            const targetAmount = Math.max(10, Math.round(baseValue));
+            return Math.max(10, Math.round(baseValue));
+        })();
 
-            const invBefore = getData('inventory');
-            const vcastBefore = invBefore.find(x => x.id === 'v_cast');
-            safeAmount = vcastBefore && vcastBefore.stock - targetAmount < 0
-                ? Math.max(0, vcastBefore.stock)
-                : targetAmount;
-        }
+        const invBefore = getData('inventory');
+        const vcastBefore = invBefore.find(x => x.id === 'v_cast');
+        safeAmount = vcastBefore && vcastBefore.stock - targetAmount < 0
+            ? Math.max(0, vcastBefore.stock)
+            : targetAmount;
 
         const sales = getData('sales');
         sales.push({ month: label, amount: safeAmount, timestamp: date.toLocaleString(), rawDate: simTime });
@@ -292,10 +292,10 @@ async function loadMonthTemplate(monthIndex, year, legacyDays) {
             let dayName, dayDesc;
             if (isHoliday) {
                 dayName = 'Holiday';
-                dayDesc = `Public holiday — closed on ${label}.`;
+                dayDesc = `Public holiday on ${label} — sales log entry recorded to keep history continuous.`;
             } else if (isWeekend) {
                 dayName = 'Weekend (Off Day)';
-                dayDesc = `Weekend — operations paused on ${label}.`;
+                dayDesc = `Weekend on ${label} — sales log entry recorded to keep history continuous.`;
             } else if (d % 7 === 0) {
                 dayName = 'Weekly Harvest';
                 dayDesc = `Simulated weekly harvest and store delivery for ${label}.`;
@@ -310,20 +310,18 @@ async function loadMonthTemplate(monthIndex, year, legacyDays) {
             saveData('daily_logs', logs);
         }
 
-        if (!isOffDay) {
-            updateStock('v_cast', -safeAmount, `Daily Sale: ${label}`);
+        updateStock('v_cast', -safeAmount, `Daily Sale: ${label}`);
 
-            if (d % 7 === 0) {
-                const replenishQty = legacyDays === 7 ? 100 : 150;
-                updateStock('v_cast', replenishQty, `Scheduled Production: ${label}`);
+        if (d % 7 === 0) {
+            const replenishQty = legacyDays === 7 ? 100 : 150;
+            updateStock('v_cast', replenishQty, `Scheduled Production: ${label}`);
 
-                const prod = getData('production');
-                prod.push({ id: `B-SIM-${d}`, qty: replenishQty, startDate: date.toLocaleDateString(), status: 'Harvested' });
-                saveData('production', prod);
+            const prod = getData('production');
+            prod.push({ id: `B-SIM-${d}`, qty: replenishQty, startDate: date.toLocaleDateString(), status: 'Harvested' });
+            saveData('production', prod);
 
-                const updatedInv = getData('inventory');
-                calData[ds].stock = updatedInv.find(x => x.id === 'v_cast').stock;
-            }
+            const updatedInv = getData('inventory');
+            calData[ds].stock = updatedInv.find(x => x.id === 'v_cast').stock;
         }
     }
     saveDataToCalendar(calData);
